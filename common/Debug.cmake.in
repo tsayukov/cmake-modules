@@ -1,0 +1,39 @@
+# Flexible CMake Modules
+# ------------------------------------------------------------------------------
+# Author: Pavel Tsayukov
+# Repository: https://github.com/tsayukov/flexible-cmake-modules
+# Distributed under the MIT License. See the accompanying file LICENSE or
+# https://opensource.org/license/mit for details.
+# ------------------------------------------------------------------------------
+#
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# FOR COAUTHORS AND CONTRIBUTORS: fill in your name, contacts, and changes above
+#
+#[=================================================================[#github/wiki
+  # Debugging
+
+  ## fcm_create_symlink_to_compile_commands
+
+  Create a symbolic link in the [`PROJECT_SOURCE_DIR`][1]`/build/` directory
+  to `compile_commands.json` if `PROJECT_SOURCE_DIR/build/` itself
+  is not [`PROJECT_BINARY_DIR`][2]. See [`CMAKE_EXPORT_COMPILE_COMMANDS`][3]
+  for details.
+
+  [1]: https://cmake.org/cmake/help/latest/variable/PROJECT_SOURCE_DIR.html
+  [2]: https://cmake.org/cmake/help/latest/variable/PROJECT_BINARY_DIR.html
+  [3]: https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html
+
+#]=================================================================]#github/wiki
+
+include_guard(GLOBAL)
+
+
+function(@FCM_COMMAND_PREFIX@create_symlink_to_compile_commands)
+  if (NOT PROJECT_BINARY_DIR STREQUAL "${PROJECT_SOURCE_DIR}/build")
+    file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/build")
+    execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
+      "${PROJECT_BINARY_DIR}/compile_commands.json"
+      "${PROJECT_SOURCE_DIR}/build/compile_commands.json"
+    )
+  endif()
+endfunction()

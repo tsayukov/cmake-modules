@@ -1,0 +1,160 @@
+# Flexible CMake Modules
+# ------------------------------------------------------------------------------
+# Author: Pavel Tsayukov
+# Repository: https://github.com/tsayukov/flexible-cmake-modules
+# Distributed under the MIT License. See the accompanying file LICENSE or
+# https://opensource.org/license/mit for details.
+# ------------------------------------------------------------------------------
+#
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# FOR COAUTHORS AND CONTRIBUTORS: fill in your name, contacts, and changes above
+#
+#[=================================================================[#github/wiki
+  # Getters of FCM Configuration Variables
+
+  ## Table of Contents
+
+  - [fcm_get_command_prefixes](#fcm_get_command_prefixes)
+  - [fcm_get_project_target_prefix](#fcm_get_project_target_prefix)
+  - [fcm_get_project_cache_prefix](#fcm_get_project_cache_prefix)
+
+  ## fcm_get_command_prefixes
+
+  Use an `FCM_COMMAND_PREFIX` and `FCM_PROJECT_COMMAND_PREFIX` variables after
+  calling this command to get their values.
+
+  ## fcm_get_project_target_prefix
+
+  Use an `FCM_PROJECT_TARGET_PREFIX` variable after calling this command
+  to get its value.
+
+  ## fcm_get_project_cache_prefix
+
+  Use an `FCM_PROJECT_CACHE_PREFIX` variable after calling this command
+  to get its value.
+
+#]=================================================================]#github/wiki
+
+include_guard(GLOBAL)
+
+
+function(@FCM_COMMAND_PREFIX@internal_find_fcm_cache_file
+  file
+  output_variable
+)
+  set(path_suffix "@__FCM_RELATIVE_CACHE_DIR__@/${file}")
+
+  set(source_dir "${PROJECT_SOURCE_DIR}")
+  set(binary_dir "${PROJECT_BINARY_DIR}")
+  while (NOT EXISTS "${binary_dir}/${path_suffix}")
+    get_property(source_dir
+      DIRECTORY ${source_dir}
+      PROPERTY PARENT_DIRECTORY
+    )
+
+    if (source_dir STREQUAL "")
+      message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+        "No FCM cache file \"${file}\" were found."
+      )
+      return()
+    endif()
+
+    get_property(binary_dir
+      DIRECTORY ${source_dir}
+      PROPERTY BINARY_DIR
+    )
+  endwhile()
+
+  set(${output_variable} "${binary_dir}/${path_suffix}" PARENT_SCOPE)
+endfunction()
+
+function(@FCM_COMMAND_PREFIX@get_command_prefixes)
+  @FCM_COMMAND_PREFIX@internal_find_fcm_cache_file("FCM_TEMPLATE_PREFIXES" file)
+  file(READ "${file}" content)
+
+  list(LENGTH content content_length)
+  if (NOT content_length EQUAL "@__FCM_TEMPLATE_PREFIXES_LENGTH__@")
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "FCM cache file \"FCM_TEMPLATE_PREFIXES\" are corrupted !!!"
+    )
+    return()
+  endif()
+
+  list(GET content @__FCM_COMMAND_PREFIX_INDEX__@ FCM_COMMAND_PREFIX)
+  list(GET content @__FCM_PROJECT_COMMAND_PREFIX_INDEX__@ FCM_PROJECT_COMMAND_PREFIX)
+
+  if (FCM_COMMAND_PREFIX STREQUAL "")
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "`FCM_COMMAND_PREFIX` must be non-empty."
+    )
+    return()
+  endif()
+
+  foreach (variable IN ITEMS
+    "FCM_COMMAND_PREFIX"
+    "FCM_PROJECT_COMMAND_PREFIX"
+  )
+    if (NOT ${variable} STREQUAL ""
+          AND NOT ${variable} MATCHES "^[_A-Za-z][_0-9A-Za-z]*$")
+      message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+        "`${variable}` must be a proper C identifier, "
+        "but after reading FCM cache file \"FCM_TEMPLATE_PREFIXES\" "
+        "its value is \"${${variable}}\"."
+      )
+      return()
+    endif()
+    set(${variable} "${${variable}}" PARENT_SCOPE)
+  endforeach()
+endfunction()
+
+function(@FCM_COMMAND_PREFIX@get_project_target_prefix)
+  @FCM_COMMAND_PREFIX@internal_find_fcm_cache_file("FCM_PREFIXES" file)
+  file(READ "${file}" content)
+
+  list(LENGTH content content_length)
+  if (NOT content_length EQUAL "@__FCM_PREFIXES_LENGTH__@")
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "FCM cache file \"FCM_PREFIXES\" are corrupted !!!"
+    )
+    return()
+  endif()
+
+  list(GET content @__FCM_PROJECT_TARGET_PREFIX_INDEX__@ FCM_PROJECT_TARGET_PREFIX)
+
+  if (NOT FCM_PROJECT_TARGET_PREFIX STREQUAL ""
+        AND NOT FCM_PROJECT_TARGET_PREFIX MATCHES "^[_A-Za-z][_0-9A-Za-z]*$")
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "`FCM_PROJECT_TARGET_PREFIX` must be a proper C identifier, "
+      "but after reading FCM cache file \"FCM_PREFIXES\" "
+      "its value is \"${FCM_PROJECT_TARGET_PREFIX}\"."
+    )
+    return()
+  endif()
+  set(FCM_PROJECT_TARGET_PREFIX "${FCM_PROJECT_TARGET_PREFIX}" PARENT_SCOPE)
+endfunction()
+
+function(@FCM_COMMAND_PREFIX@get_project_cache_prefix)
+  @FCM_COMMAND_PREFIX@internal_find_fcm_cache_file("FCM_PREFIXES" file)
+  file(READ "${file}" content)
+
+  list(LENGTH content content_length)
+  if (NOT content_length EQUAL "@__FCM_PREFIXES_LENGTH__@")
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "FCM cache file \"FCM_PREFIXES\" are corrupted !!!"
+    )
+    return()
+  endif()
+
+  list(GET content @__FCM_PROJECT_CACHE_PREFIX_INDEX__@ FCM_PROJECT_CACHE_PREFIX)
+
+  if (NOT FCM_PROJECT_CACHE_PREFIX STREQUAL ""
+        AND NOT FCM_PROJECT_CACHE_PREFIX MATCHES "^[_A-Za-z][_0-9A-Za-z]*$")
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "`FCM_PROJECT_CACHE_PREFIX` must be a proper C identifier, "
+      "but after reading FCM cache file \"FCM_PREFIXES\" "
+      "its value is \"${FCM_PROJECT_CACHE_PREFIX}\"."
+    )
+    return()
+  endif()
+  set(FCM_PROJECT_CACHE_PREFIX "${FCM_PROJECT_CACHE_PREFIX}" PARENT_SCOPE)
+endfunction()

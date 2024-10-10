@@ -13,6 +13,7 @@ include_guard(GLOBAL)
 # Otherwise, call the `define_project_namespace(<namespace>)` command.
 define_project_namespace()
 
+get_project_is_top_level()
 
 ############################### Project options ################################
 

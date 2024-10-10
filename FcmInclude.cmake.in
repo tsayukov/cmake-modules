@@ -1,0 +1,138 @@
+# Flexible CMake Modules
+# ------------------------------------------------------------------------------
+# Author: Pavel Tsayukov
+# Repository: https://github.com/tsayukov/flexible-cmake-modules
+# Distributed under the MIT License. See the accompanying file LICENSE or
+# https://opensource.org/license/mit for details.
+# ------------------------------------------------------------------------------
+#
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# FOR COAUTHORS AND CONTRIBUTORS: fill in your name, contacts, and changes above
+#
+#[=================================================================[#github/wiki
+  # fcm_include
+
+  An extended version of the [`include()`][1] command.
+
+  ```
+  fcm_include(<file|module|template> [TEMPLATE] [<cmake_include_parameters>...])
+  ```
+
+  If the `TEMPLATE` option is present and a module is specified instead
+  of a file, then the files named `<module_name>.cmake`
+  and `<module_name>.cmake.in` are searched in [`CMAKE_MODULE_PATH`][2],
+  but not in the CMake builtin module directory. If the template file is found
+  in [`PROJECT_SOURCE_DIR`][3]`/<dirs>/`, then it will be copied
+  to [`PROJECT_BINARY_DIR`][4]`/<dirs>/` while performing [transformations][5]
+  of the template file using [FCM configuration variables][6],
+  and a `.in` extension will be removed, if any.
+
+  [1]: https://cmake.org/cmake/help/latest/command/include.html
+  [2]: https://cmake.org/cmake/help/latest/variable/CMAKE_MODULE_PATH.html
+  [3]: https://cmake.org/cmake/help/latest/variable/PROJECT_SOURCE_DIR.html
+  [4]: https://cmake.org/cmake/help/latest/variable/PROJECT_BINARY_DIR.html
+  [5]: https://cmake.org/cmake/help/latest/command/configure_file.html#transformations
+  [6]: https://github.com/tsayukov/flexible-cmake-modules/wiki/Getters-of-FCM-Configuration-Variables
+
+#]=================================================================]#github/wiki
+
+include_guard(GLOBAL)
+
+# Require "common/FcmConfigVariables.cmake.in"
+# Require "common/ParseArgs.cmake.in"
+
+
+macro(@FCM_COMMAND_PREFIX@include
+  file
+)
+  set(__ARGN "")
+  @FCM_COMMAND_PREFIX@parse_and_remove_arguments_from(__ARGN __INPUT__ ${ARGN}
+    __OPTIONS__ "TEMPLATE"
+  )
+
+  if (NOT ARGS_TEMPLATE)
+    include("${file}" ${__ARGN})
+  else()
+    @FCM_COMMAND_PREFIX@internal_include_template("${file}" ${__ARGN})
+  endif()
+
+  unset(ARGS_TEMPLATE)
+  unset(__ARGN)
+endmacro()
+
+macro(@FCM_COMMAND_PREFIX@internal_include_template
+  file
+)
+  set(__ARGN "")
+  @FCM_COMMAND_PREFIX@parse_and_remove_arguments_from(__ARGN __INPUT__ ${ARGN}
+    __OPTIONS__ "OPTIONAL"
+    __ONE_VALUE_KEYS__ "RESULT_VARIABLE"
+  )
+
+  set(__search_list "${file}")
+  list(TRANSFORM CMAKE_MODULE_PATH
+    APPEND "/${file}.cmake"
+    OUTPUT_VARIABLE __module_path_with_cmake_ext
+  )
+  list(TRANSFORM CMAKE_MODULE_PATH
+    APPEND "/${file}.cmake.in"
+    OUTPUT_VARIABLE __module_path_with_cmake_in_ext
+  )
+  list(APPEND __search_list
+    ${__module_path_with_cmake_ext}
+    ${__module_path_with_cmake_in_ext}
+  )
+  unset(__module_path_with_cmake_ext)
+  unset(__module_path_with_cmake_in_ext)
+
+  set(__result "NOTFOUND")
+  foreach (path IN LISTS __search_list)
+    if (NOT IS_ABSOLUTE "${path}")
+      set(path "${CMAKE_CURRENT_SOURCE_DIR}/${path}")
+    endif()
+
+    if (EXISTS "${path}")
+      file(RELATIVE_PATH __generated_file "${PROJECT_SOURCE_DIR}" "${path}")
+      string(REGEX REPLACE "\.in$" "" __generated_file "${__generated_file}")
+      string(REPLACE "../" "two-dots/" __generated_file "${__generated_file}")
+      set(__generated_file "${PROJECT_BINARY_DIR}/${__generated_file}")
+
+      get_property(__FCM_RECONFIGURE_TEMPLATES__
+        GLOBAL PROPERTY __FCM_RECONFIGURE_TEMPLATES__
+      )
+      if (__FCM_RECONFIGURE_TEMPLATES__)
+        file(REMOVE "${__generated_file}")
+      endif()
+      unset(__FCM_RECONFIGURE_TEMPLATES__)
+
+      if ("${path}" IS_NEWER_THAN "${__generated_file}")
+        @FCM_COMMAND_PREFIX@get_command_prefixes()
+        configure_file("${path}" "${__generated_file}" @ONLY)
+      endif()
+
+      set(__result "${__generated_file}")
+      break()
+    endif()
+  endforeach()
+
+  unset(__search_list)
+
+  if (__result)
+    include("${__generated_file}" ${__ARGN})
+  elseif (NOT ARGS_OPTIONAL)
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "@FCM_COMMAND_PREFIX@include could not find requested template file:\n"
+      "  ${file}"
+    )
+  endif()
+
+  if (DEFINED ARGS_RESULT_VARIABLE)
+    set(${ARGS_RESULT_VARIABLE} "${__result}")
+  endif()
+
+  unset(__generated_file)
+  unset(__result)
+  unset(ARGS_OPTIONAL)
+  unset(ARGS_RESULT_VARIABLE)
+  unset(__ARGN)
+endmacro()

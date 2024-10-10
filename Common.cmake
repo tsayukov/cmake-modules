@@ -35,7 +35,7 @@ include_guard(GLOBAL)
   options, and project cached variables.
 #]=============================================================================]
 macro(__init_common)
-  include("${CMAKE_CURRENT_LIST_DIR}/common/Internal.cmake")
+  include("${CMAKE_CURRENT_LIST_DIR}/common/__Internal.cmake")
 
   # This guard should be at the beginning
   __after_project_guard()

@@ -1,0 +1,357 @@
+# Flexible CMake Modules
+# ------------------------------------------------------------------------------
+# Author: Pavel Tsayukov
+# Repository: https://github.com/tsayukov/flexible-cmake-modules
+# Distributed under the MIT License. See the accompanying file LICENSE or
+# https://opensource.org/license/mit for details.
+# ------------------------------------------------------------------------------
+#
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# FOR COAUTHORS AND CONTRIBUTORS: fill in your name, contacts, and changes above
+#
+#[=================================================================[#github/wiki
+  # Advanced Argument Parsing
+
+  Auxiliary commands for argument parsing.
+
+  ## Table of Contents
+
+  - [fcm_parse_and_remove_arguments_from](#fcm_parse_and_remove_arguments_from)
+  - [fcm_only_one_of_variables_is_true](#fcm_only_one_of_variables_is_true)
+  - [fcm_only_one_of_variables_is_defined](#fcm_only_one_of_variables_is_defined)
+  - [fcm_is_pair](#fcm_is_pair)
+  - [fcm_extract_pair](#fcm_extract_pair)
+
+  ## fcm_parse_and_remove_arguments_from
+
+  Parse specified arguments of a function or macro and remove their first
+  appearance. Use it in a function or macro that wraps an existing command
+  if you need to extend the parameters of the last one.
+
+  ```
+  fcm_parse_and_remove_arguments_from(<variable> [__INPUT__ <arguments>...]
+                                      [__OUTPUT_VARIABLE__ <output_variable>]
+                                      [__PREFIX__ <argument_prefix>]
+                                      [__OPTIONS__ <options>...]
+                                      [__ONE_VALUE_KEYS__ <one-value-keywords>...])
+  ```
+
+  Parse arguments from `<variable>` and, if the `__INPUT__` list is present,
+  from `<arguments>`. If this command is called in a macro body,
+  the way to parse `ARGN` or [similar][1] is as follows:
+
+  ```cmake
+  macro(bar)
+    set(__ARGN "")
+    fcm_parse_and_remove_arguments_from(__ARGN __INPUT__ ${ARGN}
+      # ...
+    )
+    # ...
+  endmacro()
+  ```
+
+  The `<options>` arguments following `__OPTIONS__` contain all extra options
+  for the respective command.
+
+  The `<one-value-keywords>` arguments following `__ONE_VALUE_KEYS__` contain
+  all extra keywords for the respective command which are followed by one value.
+
+  After the first appearance of the extra arguments found, their values will
+  be stored in variables with names corresponding to the respective keyword
+  and following `<argument_prefix>` and an underscore, e.g., let's say we have
+  the `foo` command:
+
+  ```cmake
+  function(foo)
+    fcm_parse_and_remove_arguments_from(ARGN
+      __PREFIX__ "MY_PREFIX"
+      __OPTIONS__ "SKIP_ALL"
+      __ONE_VALUE_KEYS__ "DESTINATION" "RENAME"
+    )
+    # ...
+  endfunction()
+
+  foo(DESTINATION /usr/local/bin)
+  ```
+
+  After the `foo` call, the value of `MY_PREFIX_SKIP_ALL` will be `FALSE`,
+  the value of `MY_PREFIX_DESTINATION` will be `/usr/local/bin`,
+  and the value of `MY_PREFIX_RENAME` will be unset. By default,
+  the `<argument_prefix>` is `ARGS`.
+
+  Passing options and keywords with their values will be removed, but only their
+  first appearance.
+
+  ```cmake
+  function(foo)
+    fcm_parse_and_remove_arguments_from(ARGN
+      __OPTIONS__ "O1"
+      __ONE_VALUE_KEYS__ "K1" "K2"
+    )
+    # ...
+  endfunction()
+
+  # The first "K1" will not be removed because it doesn't have any following
+  # value; other keywords are not a value
+  foo(K1 K1 value)
+  foo(K1 O1 K1 value)
+  foo(K1 K2 value_2 K1 value_1)
+  ```
+
+  Remaining arguments will be stored in-place
+  in the `<variable>` or in the specified `<output_variable>` following
+  `__OUTPUT_VARIABLE__`.
+
+  ## fcm_only_one_of_variables_is_true
+
+  Check if only one of the passed variables is [true][3]. Use to test mutual
+  exclusive options in commands.
+
+  ```
+  fcm_only_one_of_variables_is_true(<variables>...)
+  ```
+
+  Usage:
+
+  ```cmake
+  function(foo)
+    cmake_parse_arguments(PARSE_ARGV 0 "ARGS" "O1;O2;O3" "" "")
+    fcm_only_one_of_variables_is_true() # Always true
+    fcm_only_one_of_variables_is_true(ARGS_O1 ARGS_O2 ARGS_O3)
+    # ...
+  endfunction()
+  ```
+
+  ## fcm_only_one_of_variables_is_defined
+
+  Check if only one of the passed variables is [defined][4]. Use to test mutual
+  exclusive one- and/or multi-value keywords in commands.
+
+  ```
+  fcm_only_one_of_variables_is_defined(<variables>...)
+  ```
+
+  Usage:
+
+  ```cmake
+  function(foo)
+    cmake_parse_arguments(PARSE_ARGV 0 "ARGS" "" "K1;K2" "L1")
+    fcm_only_one_of_variables_is_defined() # Always true
+    fcm_only_one_of_variables_is_defined(ARGS_K1 ARGS_K2 ARGS_L1)
+    # ...
+  endfunction()
+  ```
+
+  ## fcm_is_pair
+
+  Check if the variable holds a pair, that is, a list of two elements.
+  Otherwise, raise an error.
+
+  ```
+  fcm_is_pair(<variable>)
+  ```
+
+  Usage:
+
+  ```cmake
+  set(empty_pair ";")
+  fcm_is_pair(empty_pair)
+
+  set(pair 1 2)
+  fcm_is_pair(pair)
+
+  set(empty_list "")
+  fcm_is_pair(empty_list) # Error
+
+  set(single_element 42)
+  fcm_is_pair(single_element) # Error
+
+  set(xs 1 2 3 4 5)
+  fcm_is_pair(xs) # Error
+  ```
+
+  ## fcm_extract_pair
+
+  Extract the key and value from the variable to `<output_variable_with_key>`
+  following `KEY_TO` and to `<output_variable_with_value>` following `VALUE_TO`
+  respectively. Raise an error if the variable is not a pair.
+
+  ```
+  fcm_extract_pair(<variable>
+                  [KEY_TO <output_variable_with_key>]
+                  [VALUE_TO <output_variable_with_value>])
+  ```
+
+  [1]: https://cmake.org/cmake/help/latest/command/macro.html#arguments
+  [2]: https://cmake.org/cmake/help/latest/command/cmake_parse_arguments.html
+  [3]: https://cmake.org/cmake/help/latest/command/if.html#variable
+  [4]: https://cmake.org/cmake/help/latest/command/if.html#defined
+
+#]=================================================================]#github/wiki
+
+include_guard(GLOBAL)
+
+
+macro(@FCM_COMMAND_PREFIX@parse_and_remove_arguments_from
+  variable
+)
+  @FCM_COMMAND_PREFIX@internal_parse_and_remove_arguments_from(${variable}
+    __INPUT__ ${${}${variable}}
+    ${ARGN}
+  )
+endmacro()
+
+function(@FCM_COMMAND_PREFIX@internal_parse_and_remove_arguments_from
+  variable
+)
+  cmake_parse_arguments(PARSE_ARGV 1 "__ARGS"
+    ""
+    "__PREFIX__;__OUTPUT_VARIABLE__"
+    "__INPUT__;__OPTIONS__;__ONE_VALUE_KEYS__"
+  )
+
+  if (NOT DEFINED __ARGS___PREFIX__)
+    set(__ARGS___PREFIX__ "ARGS")
+  else()
+    set(__ARGS___PREFIX__ "${__ARGS___PREFIX__}")
+  endif()
+
+  list(REMOVE_DUPLICATES __ARGS___OPTIONS__)
+  list(REMOVE_DUPLICATES __ARGS___ONE_VALUE_KEYS__)
+
+  set(arg_indices_to_remove "")
+
+  foreach (option IN LISTS __ARGS___OPTIONS__)
+    list(FIND __ARGS___INPUT__ "${option}" option_index)
+    if (option_index EQUAL "-1")
+      set(${__ARGS___PREFIX__}_${option} FALSE PARENT_SCOPE)
+    else()
+      set(${__ARGS___PREFIX__}_${option} TRUE PARENT_SCOPE)
+      list(APPEND arg_indices_to_remove ${option_index})
+    endif()
+  endforeach()
+
+  set(found_one_value_key_indices "")
+
+  list(LENGTH __ARGS___INPUT__ input_size)
+  if (NOT input_size LESS 2)
+    math(EXPR last_index_for_key "${input_size} - 2")
+    foreach (index RANGE 0 ${last_index_for_key})
+      list(GET __ARGS___INPUT__ ${index} key)
+      list(FIND __ARGS___ONE_VALUE_KEYS__ ${key} key_index)
+      if (key_index EQUAL "-1" OR key_index IN_LIST found_one_value_key_indices)
+        continue()
+      endif()
+
+      math(EXPR next_index "${index} + 1")
+      list(GET __ARGS___INPUT__ ${next_index} value)
+      if (value IN_LIST __ARGS___OPTIONS__ OR value IN_LIST __ARGS___ONE_VALUE_KEYS__)
+        continue()
+      endif()
+
+      set(${__ARGS___PREFIX__}_${key} "${value}" PARENT_SCOPE)
+      list(APPEND found_one_value_key_indices ${key_index})
+      list(APPEND arg_indices_to_remove ${index} ${next_index})
+    endforeach()
+  endif()
+
+  if (NOT found_one_value_key_indices STREQUAL "")
+    list(REMOVE_AT __ARGS___ONE_VALUE_KEYS__ ${found_one_value_key_indices})
+    foreach (key IN LISTS __ARGS___ONE_VALUE_KEYS__)
+      unset(${__ARGS___PREFIX__}_${key} PARENT_SCOPE)
+    endforeach()
+  endif()
+
+  if (NOT arg_indices_to_remove STREQUAL "")
+    list(REMOVE_AT __ARGS___INPUT__ ${arg_indices_to_remove})
+  endif()
+
+  if (NOT DEFINED __ARGS___OUTPUT_VARIABLE__)
+    set(output_variable ${variable})
+  else()
+    set(output_variable ${__ARGS___OUTPUT_VARIABLE__})
+  endif()
+
+  if (NOT DEFINED __ARGS___INPUT__ OR __ARGS___INPUT__ STREQUAL "")
+    set(${output_variable} "" PARENT_SCOPE)
+  else()
+    set(${output_variable} ${__ARGS___INPUT__} PARENT_SCOPE)
+  endif()
+endfunction()
+
+function(@FCM_COMMAND_PREFIX@only_one_of_variables_is_true)
+  set(true_count "0")
+  foreach (variable IN LISTS ARGN)
+    if (true_count GREATER "1")
+      break()
+    endif()
+    if (${variable})
+      math(EXPR true_count "${true_count} + 1")
+    endif()
+  endforeach()
+
+  if (NOT ARGC EQUAL "0" AND NOT true_count EQUAL "1")
+    list(JOIN ARGN ", " fmt_argn)
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "Only one of ${fmt_argn} arguments can be true."
+    )
+    return()
+  endif()
+endfunction()
+
+function(@FCM_COMMAND_PREFIX@only_one_of_variables_is_defined)
+  set(true_count "0")
+  foreach (variable IN LISTS ARGN)
+    if (true_count GREATER "1")
+      break()
+    endif()
+    if (DEFINED ${variable})
+      math(EXPR true_count "${true_count} + 1")
+    endif()
+  endforeach()
+
+  if (NOT ARGC EQUAL "0" AND NOT true_count EQUAL "1")
+    list(JOIN ARGN ", " fmt_argn)
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "Only one of ${fmt_argn} arguments can be defined."
+    )
+    return()
+  endif()
+endfunction()
+
+function(@FCM_COMMAND_PREFIX@is_pair variable)
+  list(LENGTH ${variable} length)
+  if (NOT length EQUAL "2")
+    list(JOIN ${variable} ", " fmt_variable)
+    message(FATAL_ERROR ${__FCM_DEBUG_CATCH_FATAL_ERROR__}
+      "A pair are expected, but got a list of size ${length}: \"${fmt_variable}\"."
+    )
+    return()
+  endif()
+endfunction()
+
+function(@FCM_COMMAND_PREFIX@extract_pair
+  variable
+)
+  @FCM_COMMAND_PREFIX@is_pair(${variable})
+
+  cmake_parse_arguments(PARSE_ARGV 1 "ARGS" "" "KEY_TO;VALUE_TO" "")
+
+  if (DEFINED ARGS_KEY_TO)
+    list(GET ${variable} 0 ${ARGS_KEY_TO})
+    if (${ARGS_KEY_TO} STREQUAL "")
+      set(${ARGS_KEY_TO} "" PARENT_SCOPE)
+    else()
+      set(${ARGS_KEY_TO} "${${ARGS_KEY_TO}}" PARENT_SCOPE)
+    endif()
+  endif()
+
+  if (DEFINED ARGS_VALUE_TO)
+    list(GET ${variable} 1 ${ARGS_VALUE_TO})
+    if (${ARGS_VALUE_TO} STREQUAL "")
+      set(${ARGS_VALUE_TO} "" PARENT_SCOPE)
+    else()
+      set(${ARGS_VALUE_TO} "${${ARGS_VALUE_TO}}" PARENT_SCOPE)
+    endif()
+  endif()
+endfunction()

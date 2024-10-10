@@ -497,13 +497,7 @@ function(set_project_target_property target)
       PROPERTY
       PROJECT_PROPERTY
   )
-
-  __xor("${ARGS_PROPERTY}" "${ARGS_PROJECT_PROPERTY}")
-  if (NOT __xor_result)
-    message(FATAL_ERROR
-      "`PROPERTY` and `PROJECT_PROPERTY` are mutually exclusive options."
-    )
-  endif()
+  __only_one_of(ARGS_PROPERTY ARGS_PROJECT_PROPERTY)
 
   if (ARGS_PROPERTY)
     __get_key_value(ARGS_PROPERTY)
